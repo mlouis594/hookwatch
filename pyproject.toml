@@ -1,0 +1,9 @@
+[project]
+name = "hookwatch"
+version = "0.1.0"
+description = "Webhook inspector and API health monitor"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
