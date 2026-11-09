@@ -3,7 +3,7 @@
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlmodel import Session
 
 from app.db import get_session
@@ -30,7 +30,7 @@ async def receive_webhook(
     raw = await request.body()
     if len(raw) > MAX_BODY_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=413,  # Content Too Large
             detail=f"Body is {len(raw)} bytes; the limit is {MAX_BODY_BYTES}",
         )
 
