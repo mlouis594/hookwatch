@@ -16,6 +16,7 @@ class EventSummary(BaseModel):
     content_type: str | None
     size_bytes: int
     signature_status: str
+    signature_detail: str | None
     received_at: datetime
 
 
@@ -35,6 +36,7 @@ def to_summary(event: WebhookEvent) -> EventSummary:
         content_type=event.content_type,
         size_bytes=event.size_bytes,
         signature_status=event.signature_status,
+        signature_detail=event.signature_detail,
         received_at=event.received_at,
     )
 

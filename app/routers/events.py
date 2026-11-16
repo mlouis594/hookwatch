@@ -16,13 +16,16 @@ router = APIRouter(prefix="/events", tags=["events"])
 def list_events(
     session: Annotated[Session, Depends(get_session)],
     source: str | None = None,
+    signature_status: str | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[EventSummary]:
-    """List events, newest first. Filter with ?source=stripe."""
+    """List events, newest first. Filter with ?source=stripe or ?signature_status=rejected."""
     statement = select(WebhookEvent)
     if source:
         statement = statement.where(WebhookEvent.source == source)
+    if signature_status:
+        statement = statement.where(WebhookEvent.signature_status == signature_status)
     statement = statement.order_by(col(WebhookEvent.id).desc()).offset(offset).limit(limit)
     return [to_summary(event) for event in session.exec(statement)]
 

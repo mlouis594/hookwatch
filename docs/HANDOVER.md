@@ -17,18 +17,18 @@ Each project ends as a public repo with a README he can walk an interviewer thro
 | --- | --- |
 | 1. Skeleton: FastAPI, `/health`, Dockerfile, pytest, CI | Done |
 | 2. Receiver: store webhooks in SQLite, list and view events | Done |
-| 3. Signature verification (Stripe, GitHub) | **Next** |
-| 4. Replay with retries, backoff, dead-letter | Not started |
+| 3. Signature verification (Stripe, GitHub) | Done |
+| 4. Replay with retries, backoff, dead-letter | **Next** |
 | 5. Scheduled API health checks + Slack alerts | Not started |
 | 6. Dashboard page, README polish | Not started |
 
-All 10 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
+All 40 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
 
 ### What exists today
 
 - `POST /hooks/{source}`: stores method, path, query, headers (Authorization, Proxy-Authorization, and Cookie redacted), raw body bytes, content type, and size. Returns `{"id": n, "received": true}`. Sources must match `^[a-z0-9][a-z0-9_-]{0,49}$`. Bodies over 1 MB get a 413.
 - `GET /events` (newest first; `source`, `limit` 1–200, `offset`) and `GET /events/{id}` (headers, body text, parsed `json_body` when the content type is JSON).
-- `WebhookEvent.signature_status` already exists and defaults to `"unchecked"`, ready for milestone 3.
+- Signature verification (`app/verification.py`): Stripe and GitHub HMAC-SHA256 checks, a `PROVIDERS` registry keyed by source, secrets read from env on each request. Events get `signature_status` (`verified`/`rejected`/`unchecked`) and `signature_detail`; rejected ones are stored and answered with 400. `GET /events?signature_status=rejected` lists failures.
 
 ## Remaining HookWatch milestones
 
@@ -42,7 +42,7 @@ Implement both checks by hand with `hmac` and `hashlib`, not the Stripe SDK. Exp
 - **Behavior:** always store the event, even if rejected, because support needs to see failures. Set `signature_status` to `verified` or `rejected`, and add a `signature_detail` column with the reason (missing header, stale timestamp, mismatch). Return 400 on rejected so the sender sees the failure. This changes the table, so the local `hookwatch.db` has to be deleted.
 - **Structure:** put verifiers in `app/verification.py` with one function per provider, plus a registry keyed by source.
 - **Tests:** sign payloads inside the tests. Cover valid, wrong secret, stale timestamp, missing header, multiple `v1` values, a body changed after signing, and no secret configured.
-- **Manual test:** run `stripe listen --forward-to localhost:8000/hooks/stripe` (it prints the `whsec_` secret), then `stripe trigger payment_intent.succeeded`.
+- **Manual test:** run `stripe listen --all-snapshot --forward-to localhost:8000/hooks/stripe` (it prints the `whsec_` secret), then `stripe trigger payment_intent.succeeded`.
 
 ### 4. Replay
 

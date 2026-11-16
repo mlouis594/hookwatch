@@ -14,6 +14,16 @@ from app.db import get_session
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def no_webhook_secrets(monkeypatch):
+    """Start every test with no secrets set, whatever the developer's shell has.
+
+    Tests that need a secret set it themselves with monkeypatch.setenv.
+    """
+    monkeypatch.delenv("STRIPE_WEBHOOK_SECRET", raising=False)
+    monkeypatch.delenv("GITHUB_WEBHOOK_SECRET", raising=False)
+
+
 @pytest.fixture
 def client():
     # StaticPool keeps one connection open, so the in-memory DB survives

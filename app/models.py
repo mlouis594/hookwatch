@@ -22,6 +22,8 @@ class WebhookEvent(SQLModel, table=True):
     body: bytes
     content_type: str | None = None
     size_bytes: int
-    # "unchecked" for now; milestone 3 sets "verified" or "rejected".
-    signature_status: str = "unchecked"
+    # "verified", "rejected", or "unchecked" (no verifier or no secret configured).
+    signature_status: str = Field(default="unchecked", index=True)
+    # Why it was rejected (or left unchecked), e.g. "Missing Stripe-Signature header".
+    signature_detail: str | None = None
     received_at: datetime = Field(default_factory=utcnow, index=True)

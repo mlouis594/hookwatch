@@ -10,7 +10,12 @@ def test_receive_webhook_stores_event(client):
     response = send(client)
 
     assert response.status_code == 200
-    assert response.json() == {"id": 1, "received": True}
+    assert response.json() == {
+        "id": 1,
+        "received": True,
+        "signature_status": "unchecked",
+        "signature_detail": "STRIPE_WEBHOOK_SECRET is not set",
+    }
 
 
 def test_event_detail_has_headers_body_and_parsed_json(client):
