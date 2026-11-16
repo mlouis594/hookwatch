@@ -10,13 +10,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__
-from app.db import init_db
+from app.db import engine, init_db
+from app.replay import recover_interrupted_replays
 from app.routers import events, hooks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()  # create tables on startup
+    recover_interrupted_replays(engine)  # retries don't survive a restart
     yield
 
 

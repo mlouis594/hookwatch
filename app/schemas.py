@@ -4,9 +4,9 @@ import json
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
-from app.models import WebhookEvent
+from app.models import DeliveryAttempt, WebhookEvent
 
 
 class EventSummary(BaseModel):
@@ -17,6 +17,7 @@ class EventSummary(BaseModel):
     size_bytes: int
     signature_status: str
     signature_detail: str | None
+    replay_status: str | None
     received_at: datetime
 
 
@@ -28,6 +29,31 @@ class EventDetail(EventSummary):
     json_body: Any | None = None
 
 
+class ReplayRequest(BaseModel):
+    target_url: HttpUrl
+
+
+class ReplayAccepted(BaseModel):
+    event_id: int
+    target_url: str
+    replay_status: str
+    attempts_url: str
+
+
+class AttemptOut(BaseModel):
+    attempt_number: int
+    target_url: str
+    status_code: int | None
+    error: str | None
+    response_excerpt: str | None
+    duration_ms: int
+    attempted_at: datetime
+
+
+def to_attempt(attempt: DeliveryAttempt) -> AttemptOut:
+    return AttemptOut.model_validate(attempt, from_attributes=True)
+
+
 def to_summary(event: WebhookEvent) -> EventSummary:
     return EventSummary(
         id=event.id,
@@ -37,6 +63,7 @@ def to_summary(event: WebhookEvent) -> EventSummary:
         size_bytes=event.size_bytes,
         signature_status=event.signature_status,
         signature_detail=event.signature_detail,
+        replay_status=event.replay_status,
         received_at=event.received_at,
     )
 

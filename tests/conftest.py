@@ -7,10 +7,10 @@ hookwatch.db and never affect each other.
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import SQLModel, create_engine
 
 from app import models  # noqa: F401  (registers the tables)
-from app.db import get_session
+from app.db import get_engine
 from app.main import app
 
 
@@ -33,11 +33,8 @@ def client():
     )
     SQLModel.metadata.create_all(engine)
 
-    def override_get_session():
-        with Session(engine) as session:
-            yield session
-
-    app.dependency_overrides[get_session] = override_get_session
+    # Sessions (per request and in background replays) all come from this engine.
+    app.dependency_overrides[get_engine] = lambda: engine
     # Not used as a context manager, so the startup hook (which would
     # create hookwatch.db) doesn't run.
     yield TestClient(app)

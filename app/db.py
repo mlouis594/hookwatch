@@ -6,7 +6,10 @@ hookwatch.db file in the working directory.
 
 import os
 from collections.abc import Iterator
+from typing import Annotated
 
+from fastapi import Depends
+from sqlalchemy import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 DATABASE_URL = os.getenv("HOOKWATCH_DB_URL", "sqlite:///./hookwatch.db")
@@ -24,7 +27,17 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 
 
-def get_session() -> Iterator[Session]:
+def get_engine() -> Engine:
+    """FastAPI dependency: the database engine.
+
+    Background tasks (replays) can't reuse the request's session, because
+    FastAPI closes it before they run, so they open their own sessions from
+    the engine. Tests override this one dependency to use an in-memory DB.
+    """
+    return engine
+
+
+def get_session(db_engine: Annotated[Engine, Depends(get_engine)]) -> Iterator[Session]:
     """FastAPI dependency: one database session per request."""
-    with Session(engine) as session:
+    with Session(db_engine) as session:
         yield session

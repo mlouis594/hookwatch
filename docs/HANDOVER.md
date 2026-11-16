@@ -18,17 +18,18 @@ Each project ends as a public repo with a README he can walk an interviewer thro
 | 1. Skeleton: FastAPI, `/health`, Dockerfile, pytest, CI | Done |
 | 2. Receiver: store webhooks in SQLite, list and view events | Done |
 | 3. Signature verification (Stripe, GitHub) | Done |
-| 4. Replay with retries, backoff, dead-letter | **Next** |
-| 5. Scheduled API health checks + Slack alerts | Not started |
+| 4. Replay with retries, backoff, dead-letter | Done |
+| 5. Scheduled API health checks + Slack alerts | **Next** |
 | 6. Dashboard page, README polish | Not started |
 
-All 40 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
+All 65 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
 
 ### What exists today
 
 - `POST /hooks/{source}`: stores method, path, query, headers (Authorization, Proxy-Authorization, and Cookie redacted), raw body bytes, content type, and size. Returns `{"id": n, "received": true}`. Sources must match `^[a-z0-9][a-z0-9_-]{0,49}$`. Bodies over 1 MB get a 413.
 - `GET /events` (newest first; `source`, `limit` 1–200, `offset`) and `GET /events/{id}` (headers, body text, parsed `json_body` when the content type is JSON).
 - Signature verification (`app/verification.py`): Stripe and GitHub HMAC-SHA256 checks, a `PROVIDERS` registry keyed by source, secrets read from env on each request. Events get `signature_status` (`verified`/`rejected`/`unchecked`) and `signature_detail`; rejected ones are stored and answered with 400. `GET /events?signature_status=rejected` lists failures.
+- Replay (`app/replay.py`): `POST /events/{id}/replay` re-sends raw body + original headers + `X-HookWatch-Replay`, in a background task. Retries connection errors, timeouts, 5xx, and 429 with 1/2/4/8 s backoff (5 attempts), then `dead_letter`; other 4xx aren't retried. Each try is a `DeliveryAttempt` row (`GET /events/{id}/attempts`). A second replay while one is pending gets 409; startup moves leftover `pending` to `dead_letter`. `get_engine` is now the DB dependency tests override.
 
 ## Remaining HookWatch milestones
 
