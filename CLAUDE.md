@@ -6,6 +6,7 @@ Read `docs/HANDOVER.md` before starting work. It has the project goal, current s
 
 - Marlon wants to move fast: build each milestone end to end (code, tests, README update), then explain what you did in plain language. He needs to be able to walk an interviewer through every part, so explain the *why*, not only the *what*.
 - One commit per milestone, message `Milestone N: <summary>`, with a short bullet list in the body.
+- Commits come from Marlon's account only. Never add `Co-Authored-By` or any other AI attribution line to commit messages or PR descriptions.
 - Keep `pytest -v` green. CI (GitHub Actions) runs the tests on every push.
 - Tick the milestone's box in the README roadmap and keep the README's endpoint table current.
 
