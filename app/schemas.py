@@ -50,6 +50,27 @@ class AttemptOut(BaseModel):
     attempted_at: datetime
 
 
+class CheckStatus(BaseModel):
+    name: str
+    url: str
+    method: str
+    interval_seconds: float
+    state: str  # "unknown", "up", or "down"
+    last_status_code: int | None
+    last_latency_ms: int | None
+    last_error: str | None
+    last_checked_at: datetime | None
+    last_changed_at: datetime | None
+
+
+class CheckResultOut(BaseModel):
+    ok: bool
+    status_code: int | None
+    latency_ms: int
+    error: str | None
+    checked_at: datetime
+
+
 def to_attempt(attempt: DeliveryAttempt) -> AttemptOut:
     return AttemptOut.model_validate(attempt, from_attributes=True)
 

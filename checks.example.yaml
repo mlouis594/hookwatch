@@ -1,0 +1,32 @@
+# HookWatch health checks. Copy to checks.yaml (gitignored) and edit:
+#   cp checks.example.yaml checks.yaml
+# Or point HOOKWATCH_CHECKS_FILE at another path.
+#
+# Fields (only name and url are required):
+#   name                  unique label, used in alerts and /checks
+#   url                   what to request
+#   method                GET (default), HEAD, POST, ...
+#   expected_status       the status code that means healthy (default 200)
+#   interval_seconds      how often to run it (default 60, minimum 5)
+#   timeout_seconds       give up after this long (default 10)
+#   failures_before_down  failed runs in a row before it counts as down and
+#                         alerts (default 1). 2 or 3 stops one-off blips
+#                         from paging anyone.
+
+checks:
+  - name: HookWatch itself
+    url: http://localhost:8000/health
+    interval_seconds: 30
+    timeout_seconds: 5
+
+  - name: GitHub API
+    url: https://api.github.com
+    interval_seconds: 60
+    failures_before_down: 2
+
+  - name: Stripe API
+    # Unauthenticated requests get 401, which proves the API is up and answering.
+    url: https://api.stripe.com/v1/charges
+    expected_status: 401
+    interval_seconds: 60
+    failures_before_down: 2

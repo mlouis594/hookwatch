@@ -7,3 +7,6 @@ __pycache__/
 
 # Stripe CLI agent skills (generated locally)
 .agents/
+
+# Local health-check config (may list internal URLs); see checks.example.yaml
+checks.yaml

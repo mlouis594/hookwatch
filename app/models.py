@@ -44,3 +44,32 @@ class DeliveryAttempt(SQLModel, table=True):
     response_excerpt: str | None = None
     duration_ms: int
     attempted_at: datetime = Field(default_factory=utcnow)
+
+
+class CheckResult(SQLModel, table=True):
+    """One run of one health check."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    check_name: str = Field(index=True)
+    ok: bool
+    status_code: int | None = None  # None when no response came back
+    latency_ms: int  # time to the response, or to the failure
+    error: str | None = None
+    checked_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class CheckState(SQLModel, table=True):
+    """The current state of one check: one row per check, updated on every run.
+
+    Kept in the database (not memory) so a restart doesn't forget a check
+    was down and alert about it all over again.
+    """
+
+    name: str = Field(primary_key=True)
+    state: str = "unknown"  # "unknown" (never ran), "up", or "down"
+    consecutive_failures: int = 0
+    last_changed_at: datetime | None = None  # when state last flipped
+    last_checked_at: datetime | None = None
+    last_status_code: int | None = None
+    last_latency_ms: int | None = None
+    last_error: str | None = None

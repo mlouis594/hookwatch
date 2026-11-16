@@ -19,10 +19,10 @@ Each project ends as a public repo with a README he can walk an interviewer thro
 | 2. Receiver: store webhooks in SQLite, list and view events | Done |
 | 3. Signature verification (Stripe, GitHub) | Done |
 | 4. Replay with retries, backoff, dead-letter | Done |
-| 5. Scheduled API health checks + Slack alerts | **Next** |
-| 6. Dashboard page, README polish | Not started |
+| 5. Scheduled API health checks + Slack alerts | Done |
+| 6. Dashboard page, README polish | **Next** |
 
-All 65 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
+All 109 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
 
 ### What exists today
 
@@ -30,6 +30,7 @@ All 65 tests pass on CI. One harmless warning remains: Starlette's test client d
 - `GET /events` (newest first; `source`, `limit` 1–200, `offset`) and `GET /events/{id}` (headers, body text, parsed `json_body` when the content type is JSON).
 - Signature verification (`app/verification.py`): Stripe and GitHub HMAC-SHA256 checks, a `PROVIDERS` registry keyed by source, secrets read from env on each request. Events get `signature_status` (`verified`/`rejected`/`unchecked`) and `signature_detail`; rejected ones are stored and answered with 400. `GET /events?signature_status=rejected` lists failures.
 - Replay (`app/replay.py`): `POST /events/{id}/replay` re-sends raw body + original headers + `X-HookWatch-Replay`, in a background task. Retries connection errors, timeouts, 5xx, and 429 with 1/2/4/8 s backoff (5 attempts), then `dead_letter`; other 4xx aren't retried. Each try is a `DeliveryAttempt` row (`GET /events/{id}/attempts`). A second replay while one is pending gets 409; startup moves leftover `pending` to `dead_letter`. `get_engine` is now the DB dependency tests override.
+- Health checks (`app/checks.py`, `app/alerts.py`): `checks.yaml` (gitignored; `checks.example.yaml` committed, path via `HOOKWATCH_CHECKS_FILE`) loaded and validated in the lifespan; a `CheckScheduler` runs one asyncio task per check, calling sync `run_check` via `asyncio.to_thread`. Results go to `CheckResult`; current state (`unknown`/`up`/`down`, consecutive failures, last change) to `CheckState`. Slack alert (`SLACK_WEBHOOK_URL`, else log) only on transition to down or down to up; optional `failures_before_down`. `GET /checks`, `GET /checks/{name}/results`.
 
 ## Remaining HookWatch milestones
 

@@ -2,7 +2,7 @@
 
 Catch, verify, inspect, and replay webhooks, and monitor the health of the APIs you depend on.
 
-> Work in progress. Milestones 1–4 are done.
+> Work in progress. Milestones 1–5 are done.
 
 ## Roadmap
 
@@ -10,7 +10,7 @@ Catch, verify, inspect, and replay webhooks, and monitor the health of the APIs 
 - [x] Webhook receiver that stores every request
 - [x] Stripe and GitHub signature verification
 - [x] Replay with retries, backoff, and a dead-letter list
-- [ ] Scheduled API health checks with Slack alerts
+- [x] Scheduled API health checks with Slack alerts
 - [ ] Dashboard page
 
 ## Run it locally (WSL / Linux)
@@ -42,6 +42,8 @@ Interactive API docs are at http://localhost:8000/docs.
 | `GET` | `/events/{id}` | One event in full: headers, raw body, parsed JSON |
 | `POST` | `/events/{id}/replay` | Re-send the event to `{"target_url": "..."}` with retries. Returns 202; 409 if a replay is already running |
 | `GET` | `/events/{id}/attempts` | Every delivery attempt for the event: status code, error, response excerpt, duration |
+| `GET` | `/checks` | Every configured health check: `up`/`down`/`unknown`, last latency, last error, when it last changed |
+| `GET` | `/checks/{name}/results` | Recent runs of one check, newest first. Supports `?limit=` |
 | `GET` | `/health` | Liveness check |
 
 Try it:
@@ -143,9 +145,64 @@ curl http://localhost:8000/events/1/attempts
 > Upgrading from milestone 3: the events table gained a `replay_status` column. Delete
 > `hookwatch.db` and restart.
 
+## Health checks and alerts
+
+HookWatch can also watch the APIs you depend on. List them in `checks.yaml`:
+
+```bash
+cp checks.example.yaml checks.yaml   # then edit; checks.yaml is gitignored
+```
+
+```yaml
+checks:
+  - name: GitHub API
+    url: https://api.github.com
+    interval_seconds: 60        # default 60, minimum 5
+    timeout_seconds: 10         # default 10
+    expected_status: 200        # default 200
+    failures_before_down: 2     # default 1
+```
+
+Each check runs on its own interval from the moment the server starts. Every run is stored
+(status code, latency, error), and `GET /checks` shows where each one stands.
+
+**Alerts only fire when a check changes state:** once when it goes down, once when it recovers
+(with how long the outage lasted). A check that fails for an hour produces one alert, not sixty.
+Alerting on every failure trains people to mute the channel, and then real outages get missed.
+`failures_before_down` goes further: with `2`, a single failed run doesn't page anyone.
+
+```
+🔴 GitHub API is DOWN: Timed out after 10s (GET https://api.github.com)
+🟢 GitHub API recovered after 4m 10s (HTTP 200 in 182 ms)
+```
+
+Alerts go to Slack when `SLACK_WEBHOOK_URL` is set (an
+[incoming webhook](https://api.slack.com/messaging/webhooks) URL; put it in `.env`), and to the
+server log otherwise. Check state is kept in the database, so a restart doesn't re-alert an
+outage that's already been reported.
+
+> Tip: set `SLACK_WEBHOOK_URL=http://localhost:8000/hooks/slack` to have HookWatch catch its own
+> alerts, then read them at `/events?source=slack`.
+
+Notes: use a different file with `HOOKWATCH_CHECKS_FILE`. Run a single worker, because each
+uvicorn worker would run every check. An invalid `checks.yaml` stops the server at startup with
+a message saying what's wrong.
+
+> Upgrading from milestone 4: two new tables (`checkresult`, `checkstate`) are created
+> automatically; no need to delete `hookwatch.db`.
+
 ## Run it with Docker
 
 ```bash
 docker build -t hookwatch .
 docker run --rm -p 8000:8000 hookwatch
+```
+
+The database lives in `/app/data` inside the container. To keep events when the container is
+recreated, mount a volume there. To run health checks, mount your config. Secrets come from `.env`:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env \
+  -v hookwatch-data:/app/data \
+  -v "$PWD/checks.yaml:/app/checks.yaml:ro" hookwatch
 ```
