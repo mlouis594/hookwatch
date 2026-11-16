@@ -6,8 +6,8 @@
 
 Marlon Louis (GitHub `mlouis594`) is building two portfolio projects for an **Integrations and API Support Advisor** role. His background is 3+ years of QoE test automation and monitoring at Witbe (Python, Selenium), then Technical Customer Success Manager. The projects need to show the problems integration support teams handle: webhooks, OAuth, rate limits, retries, and debugging failed requests.
 
-1. **HookWatch** (this repo): webhook inspector and API health monitor. **In progress.**
-2. **Stripe to HubSpot Sync** (separate repo, not created yet): OAuth integration that syncs Stripe customers and payments into HubSpot.
+1. **HookWatch** (this repo): webhook inspector and API health monitor. **Feature-complete (milestones 1–6).**
+2. **Stripe to HubSpot Sync** (separate repo, not created yet): OAuth integration that syncs Stripe customers and payments into HubSpot. **Next.**
 
 Each project ends as a public repo with a README he can walk an interviewer through.
 
@@ -20,9 +20,9 @@ Each project ends as a public repo with a README he can walk an interviewer thro
 | 3. Signature verification (Stripe, GitHub) | Done |
 | 4. Replay with retries, backoff, dead-letter | Done |
 | 5. Scheduled API health checks + Slack alerts | Done |
-| 6. Dashboard page, README polish | **Next** |
+| 6. Dashboard page, README polish | Done |
 
-All 109 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
+All 126 tests pass on CI. One harmless warning remains: Starlette's test client deprecating `httpx`. It's not from our code.
 
 ### What exists today
 
@@ -31,6 +31,11 @@ All 109 tests pass on CI. One harmless warning remains: Starlette's test client 
 - Signature verification (`app/verification.py`): Stripe and GitHub HMAC-SHA256 checks, a `PROVIDERS` registry keyed by source, secrets read from env on each request. Events get `signature_status` (`verified`/`rejected`/`unchecked`) and `signature_detail`; rejected ones are stored and answered with 400. `GET /events?signature_status=rejected` lists failures.
 - Replay (`app/replay.py`): `POST /events/{id}/replay` re-sends raw body + original headers + `X-HookWatch-Replay`, in a background task. Retries connection errors, timeouts, 5xx, and 429 with 1/2/4/8 s backoff (5 attempts), then `dead_letter`; other 4xx aren't retried. Each try is a `DeliveryAttempt` row (`GET /events/{id}/attempts`). A second replay while one is pending gets 409; startup moves leftover `pending` to `dead_letter`. `get_engine` is now the DB dependency tests override.
 - Health checks (`app/checks.py`, `app/alerts.py`): `checks.yaml` (gitignored; `checks.example.yaml` committed, path via `HOOKWATCH_CHECKS_FILE`) loaded and validated in the lifespan; a `CheckScheduler` runs one asyncio task per check, calling sync `run_check` via `asyncio.to_thread`. Results go to `CheckResult`; current state (`unknown`/`up`/`down`, consecutive failures, last change) to `CheckState`. Slack alert (`SLACK_WEBHOOK_URL`, else log) only on transition to down or down to up; optional `failures_before_down`. `GET /checks`, `GET /checks/{name}/results`.
+- Dashboard (`app/routers/dashboard.py`, `app/templates/dashboard.html`): `GET /` renders summary tiles (events, rejected, dead-lettered, checks up), a checks table with last and p95 latency (nearest-rank over the last 100 runs, also in `/checks`), and the latest 50 events with signature and replay badges. Plain Jinja2 + inline CSS, meta refresh every 30 s, light/dark.
+- README restructured: CI badge, Mermaid architecture diagram, config table, Troubleshooting (mismatch, stale timestamp, failed replays, "webhooks stopped working" playbook, Slack, dotenv, Docker), design decisions and limits.
+- Docker: DB lives in `/app/data` (owned by the non-root user) via `HOOKWATCH_DB_URL`; mount a volume there.
+- Stretch goals: p95 done. Dashboard password skipped on purpose (the JSON API would stay open; real auth would need to cover both). 24/7 deploy not done.
+- Bugs worth telling as interview story 2: system uvicorn shadowing the venv one (`dotenv` error); concurrent replays overwriting each other's status (fixed with a conditional UPDATE + 409); Docker non-root user unable to create the SQLite file.
 
 ## Remaining HookWatch milestones
 

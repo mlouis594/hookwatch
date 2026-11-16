@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="{{ refresh_seconds }}">
+  <title>HookWatch</title>
+  <style>
+    :root {
+      --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
+      --ok: #1f7a4d; --ok-bg: #e3f3ea; --bad: #b42318; --bad-bg: #fde8e6;
+      --warn: #8a5a00; --warn-bg: #fdf1d8; --neutral-bg: #ececea; --link: #2457c5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #151514; --panel: #1e1e1c; --text: #ececea; --muted: #9b9b95; --line: #30302d;
+        --ok: #6fd3a0; --ok-bg: #173527; --bad: #ff8f84; --bad-bg: #3d1b18;
+        --warn: #f0c060; --warn-bg: #3a2c10; --neutral-bg: #2c2c29; --link: #8ab0ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--text);
+           font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; }
+    header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 20px; }
+    h1 { font-size: 22px; margin: 0; }
+    h2 { font-size: 16px; margin: 32px 0 10px; }
+    .muted { color: var(--muted); }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+    .tile .n { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .tile.alarm { border-color: var(--bad); }
+    .tile.alarm .n { color: var(--bad); }
+    .table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+    tr:last-child td { border-bottom: 0; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.wrap { white-space: normal; min-width: 220px; }
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .b-ok { color: var(--ok); background: var(--ok-bg); }
+    .b-bad { color: var(--bad); background: var(--bad-bg); }
+    .b-warn { color: var(--warn); background: var(--warn-bg); }
+    .b-neutral { color: var(--muted); background: var(--neutral-bg); }
+    .empty { padding: 20px; color: var(--muted); }
+    code { font-size: 12px; background: var(--neutral-bg); padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  {% set badge = {
+    "verified": "b-ok", "delivered": "b-ok", "up": "b-ok",
+    "rejected": "b-bad", "dead_letter": "b-bad", "down": "b-bad",
+    "pending": "b-warn",
+  } %}
+
+  <header>
+    <h1>HookWatch</h1>
+    <span class="muted">v{{ version }} · refreshes every {{ refresh_seconds }}s ·
+      <a href="/docs">API docs</a></span>
+  </header>
+
+  <section class="tiles" aria-label="Summary">
+    <div class="tile"><div class="n">{{ totals.events }}</div><div class="muted">webhooks received</div></div>
+    <div class="tile {{ 'alarm' if totals.rejected }}">
+      <div class="n">{{ totals.rejected }}</div>
+      <div class="muted"><a href="/events?signature_status=rejected">signature rejected</a></div>
+    </div>
+    <div class="tile {{ 'alarm' if totals.dead_letter }}">
+      <div class="n">{{ totals.dead_letter }}</div>
+      <div class="muted"><a href="/events?replay_status=dead_letter">replays dead-lettered</a></div>
+    </div>
+    <div class="tile {{ 'alarm' if totals.checks_down }}">
+      <div class="n">{{ totals.checks - totals.checks_down }}/{{ totals.checks }}</div>
+      <div class="muted">health checks up</div>
+    </div>
+  </section>
+
+  <h2>Health checks</h2>
+  <div class="table-wrap">
+    {% if checks %}
+    <table>
+      <thead><tr>
+        <th>Check</th><th>State</th><th>Since</th><th class="num">Last</th><th class="num">p95</th>
+        <th>Last run</th><th>Last error</th>
+      </tr></thead>
+      <tbody>
+      {% for c in checks %}
+        <tr>
+          <td><a href="/checks/{{ c.name | urlencode }}/results" title="{{ c.method }} {{ c.url }}">{{ c.name }}</a></td>
+          <td><span class="badge {{ badge.get(c.state, 'b-neutral') }}">{{ c.state }}</span></td>
+          <td title="{{ c.last_changed_at | utc }}">{{ c.last_changed_at | ago }}</td>
+          <td class="num">{% if c.last_latency_ms is not none %}{{ c.last_latency_ms }} ms{% else %}–{% endif %}</td>
+          <td class="num">{% if c.p95_latency_ms is not none %}{{ c.p95_latency_ms }} ms{% else %}–{% endif %}</td>
+          <td title="{{ c.last_checked_at | utc }}">{{ c.last_checked_at | ago }}</td>
+          <td class="wrap muted">{{ c.last_error or "" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No health checks configured. Copy <code>checks.example.yaml</code> to
+      <code>checks.yaml</code> and restart.</div>
+    {% endif %}
+  </div>
+
+  <h2>Recent webhooks <span class="muted">(latest {{ recent_limit }})</span></h2>
+  <div class="table-wrap">
+    {% if events %}
+    <table>
+      <thead><tr>
+        <th>ID</th><th>Source</th><th>Received</th><th>Signature</th><th>Replay</th>
+        <th class="num">Size</th><th>Detail</th>
+      </tr></thead>
+      <tbody>
+      {% for e in events %}
+        <tr>
+          <td><a href="/events/{{ e.id }}">#{{ e.id }}</a></td>
+          <td>{{ e.source }}</td>
+          <td title="{{ e.received_at | utc }}">{{ e.received_at | ago }}</td>
+          <td><span class="badge {{ badge.get(e.signature_status, 'b-neutral') }}">{{ e.signature_status }}</span></td>
+          <td>
+            {% if e.replay_status %}
+              <a href="/events/{{ e.id }}/attempts"><span class="badge {{ badge.get(e.replay_status, 'b-neutral') }}">{{ e.replay_status }}</span></a>
+            {% else %}<span class="muted">–</span>{% endif %}
+          </td>
+          <td class="num">{{ e.size_bytes }} B</td>
+          <td class="wrap muted">{{ e.signature_detail or "" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No webhooks yet. Point a provider at <code>/hooks/&lt;source&gt;</code>, or try
+      <code>curl -X POST localhost:8000/hooks/test -d '{"hello": "world"}'</code>.</div>
+    {% endif %}
+  </div>
+</main>
+</body>
+</html>

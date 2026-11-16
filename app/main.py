@@ -16,7 +16,7 @@ from app.alerts import default_alerter
 from app.checks import CheckScheduler, load_checks
 from app.db import engine, init_db
 from app.replay import recover_interrupted_replays
-from app.routers import checks, events, hooks
+from app.routers import checks, dashboard, events, hooks
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # it logs every request at INFO
@@ -45,6 +45,7 @@ app = FastAPI(
 app.include_router(hooks.router)
 app.include_router(events.router)
 app.include_router(checks.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health", tags=["meta"])

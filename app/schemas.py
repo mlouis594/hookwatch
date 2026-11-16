@@ -58,6 +58,7 @@ class CheckStatus(BaseModel):
     state: str  # "unknown", "up", or "down"
     last_status_code: int | None
     last_latency_ms: int | None
+    p95_latency_ms: int | None  # over the last 100 runs
     last_error: str | None
     last_checked_at: datetime | None
     last_changed_at: datetime | None

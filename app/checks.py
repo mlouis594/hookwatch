@@ -18,6 +18,7 @@ worker thread so the HTTP call and database write never block the server.
 
 import asyncio
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -87,6 +88,23 @@ def load_checks(path: str | Path) -> list[CheckConfig]:
         return ChecksFile.model_validate(data).checks
     except (yaml.YAMLError, ValidationError) as exc:
         raise ChecksConfigError(f"Invalid {path}: {exc}") from exc
+
+
+# --- Latency statistics -----------------------------------------------------
+
+
+def percentile(values: list[int], pct: float) -> int | None:
+    """Nearest-rank percentile: the smallest value that pct% of values are at or below.
+
+    p95 is used instead of the average because averages hide the slow
+    requests: 19 fast responses and one 9-second one average to "fine".
+    p95 answers "how slow is it for the unlucky 1 in 20?"
+    """
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = math.ceil(pct / 100 * len(ordered))
+    return ordered[max(rank, 1) - 1]
 
 
 # --- Running one check ------------------------------------------------------

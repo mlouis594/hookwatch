@@ -10,3 +10,6 @@ __pycache__/
 
 # Local health-check config (may list internal URLs); see checks.example.yaml
 checks.yaml
+
+# Windows "downloaded from" metadata copied into WSL
+*:Zone.Identifier
